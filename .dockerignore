@@ -1,0 +1,13 @@
+.git
+**/.git
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/node_modules
+**/dist
+backend/logs
+backend/interlock_backend/django_key.py
+backend/interlock_backend/fernet_key.py
+backend/interlock_backend/local_django_settings.py
+docker-data

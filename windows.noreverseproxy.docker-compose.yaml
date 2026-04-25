@@ -1,0 +1,30 @@
+# Local / pfSense deployment. Coolify should deploy coolify.paas.compose.yaml directly and
+# expose the gateway service through its domain/proxy settings instead.
+services:
+  db:
+    extends:
+      file: coolify.paas.compose.yaml
+      service: db
+
+  backend:
+    extends:
+      file: coolify.paas.compose.yaml
+      service: backend
+    depends_on:
+      db:
+        condition: service_healthy
+
+  gateway:
+    extends:
+      file: coolify.paas.compose.yaml
+      service: gateway
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${INTERLOCK_HTTP_BIND:-0.0.0.0:8080}:8080"
+
+volumes:
+  postgres-data:
+  backend-data:
+  backend-static:

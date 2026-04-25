@@ -1,0 +1,98 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-interlockdb}
+      POSTGRES_USER: ${POSTGRES_USER:-interlockadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-postgres-password}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    build:
+      context: .
+      target: backend
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-interlockdb}
+      POSTGRES_USER: ${POSTGRES_USER:-interlockadmin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-postgres-password}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      INTERLOCK_PUBLIC_HOST: ${INTERLOCK_PUBLIC_HOST:-${SERVICE_FQDN_GATEWAY:-localhost:8080}}
+      INTERLOCK_ALLOWED_HOSTS: ${INTERLOCK_ALLOWED_HOSTS:-}
+      INTERLOCK_CSRF_TRUSTED_ORIGINS: ${INTERLOCK_CSRF_TRUSTED_ORIGINS:-}
+      INTERLOCK_CORS_ALLOWED_ORIGINS: ${INTERLOCK_CORS_ALLOWED_ORIGINS:-}
+      INTERLOCK_COOKIE_SECURE: ${INTERLOCK_COOKIE_SECURE:-false}
+      INTERLOCK_DEFAULT_SUPERUSER_USERNAME: ${INTERLOCK_DEFAULT_SUPERUSER_USERNAME:-admin}
+      INTERLOCK_DEFAULT_SUPERUSER_PASSWORD: ${INTERLOCK_DEFAULT_SUPERUSER_PASSWORD:-interlock}
+      INTERLOCK_DJANGO_SECRET_KEY: ${INTERLOCK_DJANGO_SECRET_KEY:-}
+      INTERLOCK_FERNET_KEY: ${INTERLOCK_FERNET_KEY:-}
+    volumes:
+      - backend-data:/data
+      - backend-static:/vol/static
+    expose:
+      - "8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/liveness/', timeout=5)"
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  gateway:
+    build:
+      context: .
+      target: gateway
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      INTERLOCK_BACKEND_PUBLIC_HOST: ${INTERLOCK_BACKEND_PUBLIC_HOST:-${INTERLOCK_PUBLIC_HOST:-${SERVICE_FQDN_GATEWAY:-localhost:8080}}}
+      INTERLOCK_FRONTEND_SSL: ${INTERLOCK_FRONTEND_SSL:-false}
+      INTERLOCK_REJECT_UNAUTHORIZED: ${INTERLOCK_REJECT_UNAUTHORIZED:-true}
+    expose:
+      - "8080"
+    volumes:
+      - backend-static:/srv/interlock-static:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/config/local.json >/dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres-data:
+  backend-data:
+  backend-static:
