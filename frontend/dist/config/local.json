@@ -1,0 +1,6 @@
+{
+    "backend_url": "interlock-test.brconsulting.info",
+    "ssl": true,
+    "reject_unauthorized": true,
+    "version": "Not shown in Development Mode"
+}
